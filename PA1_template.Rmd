@@ -1,0 +1,175 @@
+---
+title: "Reproducable research"
+author: "Rune Eriksen"
+date: "25 4 2019"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+ 
+## R Markdown
+Loading the data
+```{r, echo = TRUE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(chron)
+```
+ 
+```{r, echo = TRUE}
+
+a<-read.csv("activity.csv")
+head(a)
+```
+ 
+##Histogram of the total number of steps taken each day
+```{r, echo = TRUE}
+#Aggregating steps over date
+aggsteps<- aggregate(steps ~ date, a, FUN=sum)
+ 
+#Aggregated Data (all steps added for a particular date)
+head(aggsteps)
+ 
+#Plotting the histogram using hist()
+hist(aggsteps$steps, 
+     col="blue", 
+     xlab = "Frequency", 
+     ylab = "Steps",
+     main = "Total Number Of Steps Taken Each day")
+```
+#Mean and median number of steps taken each day
+```{r, echo = TRUE}
+amean <- mean(aggsteps$steps)
+amedian <- median(aggsteps$steps)
+amean
+amedian
+```
+#What is the average daily activity pattern?
+##Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+ 
+#Aggregating(summation) of steps over time interval
+```{r, echo = TRUE}
+agginterval <- aggregate(steps ~ interval, a, FUN=sum)
+```
+ 
+#Plotting the line graph using plot() for Total Steps vs 5-Minute Interval
+```{r, results="hide"}
+plot(agginterval$interval, agginterval$steps, 
+     type = "l", lwd = 2,
+     xlab = "Interval", 
+     ylab = "Total Steps",
+     main = "Total Steps vs. 5-Minute Interval")
+ 
+#Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+ 
+# Getting the 5 min interval with maximum of steps 
+filter(agginterval, steps==max(steps))
+```
+ 
+#Imputing missing values
+##Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+# TRUE represents the total number of NA values
+```{r, echo = TRUE}
+table(is.na(a))
+```
+#Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+```{r, echo = TRUE}
+#In the original data set aggregating (mean) steps over 5-minute interval
+meaninterval<- aggregate(steps ~ interval, a, FUN=mean)
+ 
+#Merging the mean of total steps for a date with the original data set
+anew <- merge(x=a, y=meaninterval, by="interval")
+ 
+#Replacing the NA values with the mean for that 5-minute interval
+anew$steps <- ifelse(is.na(anew$steps.x), anew$steps.y, anew$steps.x)
+ 
+#Merged dataset which will be subsetted in the next step by removing not required columns
+head(anew)
+```
+ 
+#Create a new dataset that is equal to the original dataset but with the missing data filled in.
+#Fetching only the required columns (steps, date, interval) and storing in the new data set.
+```{r, echo = TRUE}
+anew <- select(anew, steps, date, interval)
+ 
+#New dataset with NA imputed by mean for that 5-minute interval
+head(anew)
+```
+ 
+#Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r, echo = TRUE}
+        #Aggregating(summation) of steps over date
+        aggsteps_new<- aggregate(steps ~ date, anew, FUN=sum)
+ 
+#Setting up the pannel for one row and two columns
+par(mfrow=c(1,2))
+ 
+#Histogram after imputing NA values with mean of 5-min interval
+hist(aggsteps_new$steps, 
+     col="green",
+     xlab = "Steps", 
+     ylab = "Frequency",
+     ylim = c(0,35),
+     main = "Total Number Of Steps Taken Each day \n(After imputing NA values with \n mean of 5-min interval)",
+     cex.main = 0.7)
+ 
+#Histogram with the orginal dataset
+hist(aggsteps$steps, 
+     col="red", 
+     xlab = "Steps", 
+     ylab = "Frequency",
+     ylim = c(0,35),
+     main = "Total Number Of Steps Taken Each day \n(Orginal Dataset)",
+     cex.main = 0.7)
+ 
+ 
+par(mfrow=c(1,1)) #Resetting the panel
+ 
+amean_new <- mean(aggsteps_new$steps)
+amedian_new <- median(aggsteps_new$steps)
+ 
+#Comparing Means
+paste("New Mean      :", round(amean_new,2), "," ,  
+      " Original Mean :", round(amean,2),"," , 
+      " Difference :",round(amean_new,2) -  round(amean,2))
+ 
+paste("New Median    :", amedian_new, ",", 
+      " Original Median :", amedian,"," , 
+      " Difference :",round(amedian_new-amedian,2))
+```
+ 
+#Are there differences in activity patterns between weekdays and weekends?
+#For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+ 
+#Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r, echo = TRUE}
+table(is.weekend(anew$date))
+ 
+#Adding the new factor variable "dayofweek" which indicates whether a given date is a weekday or weekend day
+anew$dayofweek <- ifelse(is.weekend(anew$date), "weekend", "weekday")
+ 
+#Number of Weekdays and Weekends
+table(anew$dayofweek)
+ 
+#New Data after adding factor variable for weekday or weekend
+head(anew)
+ 
+#Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). The plot should look something like the following, which was created using simulated data.
+ 
+#Aggregating(mean) steps over interval and day of week
+meaninterval_new<- aggregate(steps ~ interval + dayofweek, anew, FUN=mean)
+ 
+#Aggregated Data
+head(meaninterval_new)
+ 
+#creating time Series plot using ggplot
+ggplot(meaninterval_new, aes(x=interval, y=steps)) + 
+        geom_line(color="blue", size=1) + 
+        facet_wrap(~dayofweek, nrow=2) +
+        labs(x="\nInterval", y="\nNumber of steps")
+```
+
+#knit("PA1_template.Rmd")
+
